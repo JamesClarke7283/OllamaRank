@@ -56,6 +56,9 @@ class OllamaRankApp(ctk.CTk):
         """Enable all tabs after settings are saved."""
         self.notebook._segmented_button.configure(state=["!disabled", "!disabled", "!disabled"])
 
-if __name__ == "__main__":
+def main():
     app = OllamaRankApp()
     app.mainloop()
+
+if __name__ == "__main__":
+    main()

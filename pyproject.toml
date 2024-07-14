@@ -41,9 +41,11 @@ dev = [
 Homepage = "https://github.com/JamesClarke7283/OllamaRank"
 "Bug Tracker" = "https://github.com/JamesClarke7283/OllamaRank/issues"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["ollamarank*"]
+[tool.setuptools]
+packages = ["src"]
+
+[project.scripts]
+ollamarank = "src.app:main"
 
 [tool.black]
 line-length = 100
