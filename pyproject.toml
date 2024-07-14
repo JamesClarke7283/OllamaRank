@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "OllamaRank"
+dynamic = ["version"]
+description = "A LLM evaluator similar to LMSYS chatbot arena, using the Elo ranking system"
+authors = [
+    {name = "James David Clarke", email = "james@jamesdavidclarke.com"},
+]
+license = {text = "GPL-3.0-or-later"}
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "customtkinter",
+    "ollama",
+    "tomli-w",
+    "appdirs"
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+    "mypy",
+]
+
+[project.urls]
+Homepage = "https://github.com/JamesClarke7283/OllamaRank"
+"Bug Tracker" = "https://github.com/JamesClarke7283/OllamaRank/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ollamarank*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
