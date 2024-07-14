@@ -25,7 +25,9 @@ dependencies = [
     "customtkinter",
     "ollama",
     "tomli-w",
-    "appdirs"
+    "appdirs",
+    "tortoise-orm",
+    "CTkMessagebox"
 ]
 
 [project.optional-dependencies]
