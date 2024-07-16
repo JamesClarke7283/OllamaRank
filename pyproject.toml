@@ -27,7 +27,7 @@ dependencies = [
     "tomli-w",
     "appdirs",
     "tortoise-orm",
-    "CTkMessagebox"
+    "CTkMessagebox",
 ]
 
 [project.optional-dependencies]

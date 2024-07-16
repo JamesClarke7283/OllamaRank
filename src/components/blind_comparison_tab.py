@@ -1,9 +1,10 @@
 import customtkinter as ctk
 import random
 import asyncio
-import ollama
-from typing import List, Dict
+from typing import List, Dict, Callable
 from threading import Thread
+from src.core.ollama_service import OllamaService
+from src.core.vote_outcome import VoteOutcome
 
 class ChatBubble(ctk.CTkFrame):
     def __init__(self, master, message="", is_user=False, **kwargs):
@@ -15,7 +16,7 @@ class ChatBubble(ctk.CTkFrame):
         self.message.configure(text=new_text)
 
 class BlindComparisonTab:
-    def __init__(self, parent, settings):
+    def __init__(self, parent, settings: Dict, ollama_service: OllamaService, submit_vote_callback: Callable):
         self.parent = parent
         self.settings = settings
         self.models = settings.get('models', [])
@@ -23,8 +24,10 @@ class BlindComparisonTab:
         self.chat_bubbles = {"A": None, "B": None}
         self.responses_complete = {"A": False, "B": False}
         self.voting_enabled = False
-        self.ollama_client = ollama.AsyncClient(host=f"{settings['ollama_host']}:{settings['ollama_port']}")
-        self.chat_history: Dict[str, List[Dict[str, str]]] = {"A": [], "B": []}
+        self.ollama_service = ollama_service
+        self.submit_vote_callback = submit_vote_callback
+        self.chat_history: Dict[str, List[Dict[str, str]]] = {}
+        self.session_history: Dict[str, List[Dict[str, str]]] = {}
 
         self.parent.grid_columnconfigure(0, weight=1)
         self.parent.grid_columnconfigure(1, weight=1)
@@ -74,7 +77,22 @@ class BlindComparisonTab:
         self.chat_bubbles = {"A": None, "B": None}
         self.responses_complete = {"A": False, "B": False}
         self.voting_enabled = False
-        self.chat_history = {"A": [], "B": []}
+        
+        # Initialize chat history for new models
+        self.chat_history = {
+            "A": self.session_history.get(self.current_models[0], []),
+            "B": self.session_history.get(self.current_models[1], [])
+        }
+        
+        # Display previous messages
+        for model in ["A", "B"]:
+            for message in self.chat_history[model]:
+                self.display_message(
+                    self.chat_frame_a if model == "A" else self.chat_frame_b,
+                    message['content'],
+                    is_user=(message['role'] == 'user')
+                )
+        
         self.hide_voting_buttons()
         self.new_round_button.grid_remove()
         self.send_button.configure(state="normal")
@@ -107,24 +125,17 @@ class BlindComparisonTab:
         )
 
     async def get_model_response(self, model_letter, model_name):
+        self.parent.after(0, lambda: self.create_response_bubble(model_letter))
         try:
-            stream = await self.ollama_client.chat(
-                model=model_name,
-                messages=self.chat_history[model_letter],
-                stream=True
-            )
-            self.parent.after(0, lambda: self.create_response_bubble(model_letter))
-            full_response = ""
-            async for chunk in stream:
-                content = chunk['message']['content']
-                full_response += content
-                self.parent.after(0, lambda r=full_response: self.update_chat_bubble(model_letter, r))
+            async for response in self.ollama_service.get_model_response(model_name, self.chat_history[model_letter]):
+                self.parent.after(0, lambda r=response: self.update_chat_bubble(model_letter, r))
                 await asyncio.sleep(0.01)  # Small delay to allow GUI updates
-            self.chat_history[model_letter].append({"role": "assistant", "content": full_response})
-            self.parent.after(0, lambda: self.complete_response(model_letter))
+            self.chat_history[model_letter].append({"role": "assistant", "content": response})
+            self.session_history[model_name] = self.chat_history[model_letter]
         except Exception as e:
             error_message = f"Error getting response from model: {str(e)}"
             self.parent.after(0, lambda: self.update_chat_bubble(model_letter, error_message))
+        finally:
             self.parent.after(0, lambda: self.complete_response(model_letter))
 
     def create_response_bubble(self, model_letter):
@@ -167,11 +178,24 @@ class BlindComparisonTab:
         if not self.voting_enabled:
             return
 
-        print(f"Vote: {choice}")
-        
+        model_a, model_b = self.current_models
+        outcome = None
+
+        if choice == "A":
+            outcome = VoteOutcome.WIN
+        elif choice == "B":
+            outcome = VoteOutcome.LOSS
+        elif choice == "Tie":
+            outcome = VoteOutcome.TIE
+        elif choice == "Bad":
+            outcome = VoteOutcome.BOTH_BAD
+
+        # Submit the vote asynchronously
+        Thread(target=self.submit_vote_callback, args=(model_a, model_b, outcome), daemon=True).start()
+
         # Reveal the model names after voting
-        self.chat_frame_a.configure(label_text=f"Model A: {self.current_models[0]}")
-        self.chat_frame_b.configure(label_text=f"Model B: {self.current_models[1]}")
+        self.chat_frame_a.configure(label_text=f"Model A: {model_a}")
+        self.chat_frame_b.configure(label_text=f"Model B: {model_b}")
         
         # Disable input and show New Round button
         self.send_button.configure(state="disabled")
